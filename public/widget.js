@@ -139,8 +139,15 @@
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Request failed");
-      addMsg(data.reply || "OK", "bot");
+
+// If backend returns a friendly reply even on errors (e.g., 429 limit), show it.
+if (!res.ok) {
+  addMsg(data?.reply || data?.error || "Προσωρινό πρόβλημα. Δοκίμασε ξανά σε λίγο.", "bot");
+  return;
+}
+
+addMsg(data?.reply || "OK", "bot");
+
     } catch (err) {
       addMsg("Προσωρινό πρόβλημα. Δοκίμασε ξανά σε λίγο.", "bot");
       console.error(err);
