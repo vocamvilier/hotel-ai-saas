@@ -34,13 +34,20 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
     .hai-header {
-      padding: 12px 14px; border-bottom: 1px solid #eee;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #eee;
     }
-    .hai-title { font-weight: 700; font-size: 14px; }
-    .hai-sub { font-size: 12px; opacity: .7; }
-    .hai-close { border:0; background: transparent; font-size: 18px; cursor: pointer; opacity: .7; }
+
+     .hai-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34,197,94,.18);
+    }
     .hai-body { padding: 12px; flex: 1; overflow: auto; background: #fafafa; }
     .hai-msg { margin: 8px 0; display: flex; }
     .hai-msg.user { justify-content: flex-end; }
@@ -86,18 +93,16 @@
 
   panel.innerHTML = `
     <div class="hai-header">
-      <div>
-        <div class="hai-title">Hotel Chat</div>
-        <div class="hai-sub">${hotelId}</div>
-      </div>
-      <button class="hai-close" aria-label="Close">✕</button>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <span class="hai-dot"></span>
+    <div>
+      <div class="hai-title">Hotel Chat</div>
+      <div class="hai-sub">${hotelId} • Online</div>
     </div>
-    <div class="hai-body" role="log" aria-live="polite"></div>
-    <div class="hai-meta">Powered by your backend • session: ${sessionId.slice(0,8)}…</div>
-    <div class="hai-footer">
-      <input class="hai-input" placeholder="Γράψε εδώ..." />
-      <button class="hai-send">Send</button>
-    </div>
+  </div>
+  <button class="hai-close" aria-label="Close">✕</button>
+</div>
+
   `;
 
   document.body.appendChild(btn);
