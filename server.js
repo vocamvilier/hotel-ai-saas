@@ -4,6 +4,35 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+// ===============================
+// Daily AI limit (MVP – in memory)
+// ===============================
+const DAILY_LIMIT = Number(process.env.DAILY_AI_CALL_LIMIT || 200);
+
+let currentDay = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+let aiCallsByHotel = new Map();
+
+function resetIfNewDay() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== currentDay) {
+    currentDay = today;
+    aiCallsByHotel = new Map();
+  }
+}
+
+function canCallAI(hotelId) {
+  resetIfNewDay();
+  const key = hotelId || "unknown";
+  const used = aiCallsByHotel.get(key) || 0;
+  return used < DAILY_LIMIT;
+}
+
+function incrementAI(hotelId) {
+  resetIfNewDay();
+  const key = hotelId || "unknown";
+  const used = aiCallsByHotel.get(key) || 0;
+  aiCallsByHotel.set(key, used + 1);
+}
 
 dotenv.config();
 
@@ -155,7 +184,15 @@ app.post("/api/chat", async (req, res) => {
       `Guest message: ${msg}\n\n` +
       "Reply as the hotel's receptionist.";
 
-    const response = await openai.responses.create({
+    // Daily AI limit guard (counts only OpenAI fallback)
+if (!canCallAI(hotel_id)) {
+  return res.status(429).json({
+    ok: false,
+    source: "limit",
+    reply: `Έχουμε φτάσει το ημερήσιο όριο AI για σήμερα. Ρώτα κάτι από τα FAQ (check-in, check-out, parking, breakfast) ή δοκίμασε ξανά αύριο 🙂`,
+  });
+}
+const response = await openai.responses.create({
       model: MODEL,
       instructions,
       input,
