@@ -38,14 +38,28 @@
       align-items: center;
       justify-content: space-between;
       padding: 14px 16px;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid #e5e7eb;
+      background: #ffffff;
+    }
+   .hai-title {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+
+   .hai-sub {
+     font-size: 12px;
+     opacity: .7;
+     margin-top: 2px;
+    }
+
     }
 
      .hai-dot {
       width: 10px;
       height: 10px;
       border-radius: 999px;
-      background: #22c55e;
+      background: #16a34a;
       box-shadow: 0 0 0 3px rgba(34,197,94,.18);
     }
     .hai-body { padding: 12px; flex: 1; overflow: auto; background: #fafafa; }
