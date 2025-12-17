@@ -35,6 +35,11 @@ function incrementAI(hotelId) {
 }
 
 dotenv.config();
+// MVP tenant hardening (no DB)
+const HOTEL_KEYS = {
+  "demo-hotel": "demo_key_123",
+  "olympia-athens": "olympia_secret_456",
+};
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -136,7 +141,17 @@ function faqFirst(text) {
  */
 app.post("/api/chat", async (req, res) => {
   try {
-    const { hotel_id, session_id, message } = req.body || {};
+    const { hotel_id, hotel_key, session_id, message } = req.body || {};
+// Tenant hardening check
+const expectedKey = HOTEL_KEYS[hotel_id];
+if (!expectedKey || hotel_key !== expectedKey) {
+  return res.status(401).json({
+    ok: false,
+    reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
+    source: "auth",
+  });
+}
+
 
     if (!hotel_id || typeof message !== "string") {
       return res.status(400).json({ error: "Missing hotel_id or message" });

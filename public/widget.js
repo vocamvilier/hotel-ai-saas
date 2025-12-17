@@ -2,8 +2,8 @@
   // Read hotel id from the embed script tag
   const scriptEl = document.currentScript;
   const hotelId = scriptEl?.dataset?.hotel || "demo-hotel";
-
-  // Simple session id (persist per browser)
+  const hotelKey = scriptEl?.dataset?.key || "";
+// Simple session id (persist per browser)
   const SESSION_KEY = "hotel_ai_session_id";
   let sessionId = localStorage.getItem(SESSION_KEY);
   if (!sessionId) {
@@ -131,11 +131,13 @@
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hotel_id: hotelId,
-          session_id: sessionId,
-          message
-        })
+       body: JSON.stringify({
+       hotel_id: hotelId,
+       hotel_key: hotelKey,
+       session_id: sessionId,
+       message
+})
+
       });
 
       const data = await res.json();
