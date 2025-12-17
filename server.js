@@ -199,6 +199,7 @@ const response = await openai.responses.create({
       max_output_tokens: MAX_OUTPUT_TOKENS,
       temperature: TEMPERATURE,
     });
+incrementAI(hotel_id);
 
     return res.json({
       reply:
