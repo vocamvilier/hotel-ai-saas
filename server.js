@@ -28,6 +28,12 @@ app.get("/demo", (req, res) => {
 app.get("/", (req, res) => {
   res.send("Hotel AI SaaS backend is running 🚀");
 });
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
+  });
+});
 
 /**
  * MVP chat endpoint (dummy for now)
