@@ -196,18 +196,27 @@
   panel.className = "hai-panel";
 
   panel.innerHTML = `
-    <div class="hai-header">
-  <div style="display:flex; gap:10px; align-items:center;">
-    <span class="hai-dot"></span>
-    <div>
-      <div class="hai-title">Hotel Chat</div>
-      <div class="hai-sub">${hotelId} • Online</div>
+  <div class="hai-header">
+    <div class="hai-left">
+      <span class="hai-dot"></span>
+      <div style="min-width:0">
+        <div class="hai-title">Hotel Chat</div>
+        <div class="hai-sub">${hotelId} • Online</div>
+      </div>
     </div>
+    <button class="hai-close" aria-label="Close">×</button>
   </div>
-  <button class="hai-close" aria-label="Close">×</button>
-</div>
 
-  `;
+  <div class="hai-body"></div>
+
+  <div class="hai-footer">
+    <input class="hai-input" placeholder="Write a message..." />
+    <button class="hai-send" type="button">Send</button>
+  </div>
+
+  <div class="hai-meta"></div>
+`;
+
 
   document.body.appendChild(btn);
   document.body.appendChild(panel);
