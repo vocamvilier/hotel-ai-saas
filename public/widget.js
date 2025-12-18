@@ -14,86 +14,176 @@
   // Basic styles (inline to keep MVP simple)
   const style = document.createElement("style");
   style.textContent = `
-    .hai-btn {
-      position: fixed; right: 18px; bottom: 18px;
-      width: 56px; height: 56px; border-radius: 999px;
-      border: 0; cursor: pointer;
-      box-shadow: 0 8px 20px rgba(0,0,0,.18);
-      font-size: 22px;
-      z-index: 999999;
-    }
-    .hai-panel {
-      position: fixed; right: 18px; bottom: 86px;
-      width: min(360px, calc(100vw - 36px));
-      height: 460px;
-      background: #fff; border-radius: 16px;
-      box-shadow: 0 14px 40px rgba(0,0,0,.18);
-      display: none; flex-direction: column;
-      overflow: hidden;
-      z-index: 999999;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .hai-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 16px;
-      border-bottom: 1px solid #e5e7eb;
-      background: #ffffff;
-    }
-   .hai-title {
-      font-weight: 600;
-      font-size: 14px;
-      line-height: 1.2;
-    }
+  :root { color-scheme: light; }
 
-   .hai-sub {
-     font-size: 12px;
-     opacity: .7;
-     margin-top: 2px;
-    }
+  .hai-btn{
+    position: fixed; right: 18px; bottom: 18px;
+    width: 56px; height: 56px; border-radius: 999px;
+    border: 0; cursor: pointer;
+    display: grid; place-items: center;
+    background: linear-gradient(135deg, #0b1b2b 0%, #163a4a 100%);
+    box-shadow: 0 12px 30px rgba(0,0,0,.22);
+    font-size: 22px;
+    z-index: 999999;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .hai-btn:active{ transform: translateY(1px) scale(.98); }
+  .hai-btn:hover{ box-shadow: 0 16px 42px rgba(0,0,0,.28); }
 
-    }
+  .hai-panel{
+    position: fixed; right: 18px; bottom: 86px;
+    width: min(380px, calc(100vw - 36px));
+    height: 520px;
+    background: #fff;
+    border-radius: 18px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.22);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 999999;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    border: 1px solid rgba(15,23,42,.08);
+  }
 
-     .hai-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      background: #16a34a;
-      box-shadow: 0 0 0 3px rgba(34,197,94,.18);
+  .hai-header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 14px;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(15,23,42,.08);
+  }
+
+  .hai-left{
+    display:flex; align-items:center; gap:10px;
+    min-width: 0;
+  }
+
+  .hai-dot{
+    width: 10px; height: 10px; border-radius: 999px;
+    background: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22,163,74,.18);
+    flex: 0 0 auto;
+  }
+
+  .hai-title{
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.1;
+    color: #0b1b2b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hai-sub{
+    font-size: 12px;
+    opacity: .72;
+    margin-top: 2px;
+    color: #0b1b2b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hai-close{
+    width: 34px; height: 34px;
+    border-radius: 12px;
+    border: 1px solid rgba(15,23,42,.10);
+    background: #fff;
+    cursor: pointer;
+    display: grid; place-items: center;
+    font-size: 16px;
+    line-height: 1;
+    transition: background .15s ease, transform .15s ease;
+  }
+  .hai-close:hover{ background: rgba(15,23,42,.04); }
+  .hai-close:active{ transform: scale(.98); }
+
+  .hai-body{
+    padding: 14px;
+    flex: 1;
+    overflow: auto;
+    background: radial-gradient(1200px 500px at 50% 0%, rgba(11,27,43,.06), transparent 55%),
+                #f7f8fb;
+  }
+
+  .hai-msg{ margin: 10px 0; display:flex; }
+  .hai-msg.user{ justify-content: flex-end; }
+
+  .hai-bubble{
+    max-width: 86%;
+    padding: 10px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(15,23,42,.10);
+    font-size: 13px;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: #fff;
+    color: #0b1b2b;
+    box-shadow: 0 6px 18px rgba(0,0,0,.06);
+  }
+
+  .hai-msg.user .hai-bubble{
+    background: linear-gradient(135deg, #0b1b2b 0%, #163a4a 100%);
+    color: #fff;
+    border-color: rgba(255,255,255,.12);
+  }
+
+  .hai-footer{
+    padding: 10px;
+    border-top: 1px solid rgba(15,23,42,.08);
+    background: #fff;
+    display:flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .hai-input{
+    flex:1;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(15,23,42,.14);
+    outline: none;
+    font-size: 13px;
+    background: #fff;
+  }
+  .hai-input:focus{
+    border-color: rgba(22,163,74,.45);
+    box-shadow: 0 0 0 4px rgba(22,163,74,.14);
+  }
+
+  .hai-send{
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 0;
+    cursor: pointer;
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    color: #fff;
+    font-weight: 700;
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .hai-send:hover{ filter: brightness(1.02); }
+  .hai-send:active{ transform: translateY(1px) scale(.99); }
+
+  .hai-meta{ font-size: 11px; opacity: .6; padding: 0 12px 10px; }
+
+  /* Mobile: full-screen panel για να δείχνει “app-like” */
+  @media (max-width: 520px){
+    .hai-panel{
+      right: 10px; left: 10px;
+      bottom: 10px;
+      width: auto;
+      height: calc(100dvh - 20px);
+      border-radius: 18px;
     }
-    .hai-body { padding: 12px; flex: 1; overflow: auto; background: #fafafa; }
-    .hai-msg { margin: 8px 0; display: flex; }
-    .hai-msg.user { justify-content: flex-end; }
-    .hai-bubble {
-      max-width: 85%;
-      padding: 10px 12px;
-      border-radius: 14px;
-      background: #fff;
-      border: 1px solid #eee;
-      font-size: 13px;
-      line-height: 1.35;
-      background: #0b1b2b;
-      color: #fff;
-      white-space: pre-wrap;
-    }
-    .hai-msg.user .hai-bubble { background: #f0f7ff; border-color: #d7ebff; }
-    .hai-footer {
-      padding: 10px; border-top: 1px solid #eee; background: #fff;
-      display: flex; gap: 8px; align-items: center;
-    }
-    .hai-input {
-      flex: 1; padding: 10px 12px;
-      border-radius: 12px; border: 1px solid #ddd;
-      outline: none; font-size: 13px;
-    }
-    .hai-send {
-      padding: 10px 12px; border-radius: 12px;
-      border: 1px solid #ddd; cursor: pointer;
-      background: #fff;
-    }
-    .hai-meta { font-size: 11px; opacity: .6; padding: 0 12px 10px; }
-  `;
+    .hai-btn{ right: 14px; bottom: 14px; }
+  }
+`;
+
   document.head.appendChild(style);
 
   // UI elements
@@ -114,7 +204,7 @@
       <div class="hai-sub">${hotelId} • Online</div>
     </div>
   </div>
-  <button class="hai-close" aria-label="Close">✕</button>
+  <button class="hai-close" aria-label="Close">×</button>
 </div>
 
   `;
