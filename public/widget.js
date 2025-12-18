@@ -204,18 +204,19 @@
         <div class="hai-sub">${hotelId} • Online</div>
       </div>
     </div>
-    <button class="hai-close" aria-label="Close">×</button>
+    <button class="hai-close" type="button" aria-label="Close">×</button>
   </div>
 
   <div class="hai-body"></div>
 
   <div class="hai-footer">
-    <input class="hai-input" placeholder="Write a message..." />
+    <input class="hai-input" type="text" placeholder="Write a message..." autocomplete="off" />
     <button class="hai-send" type="button">Send</button>
   </div>
 
   <div class="hai-meta"></div>
 `;
+
 
 
   document.body.appendChild(btn);
@@ -279,12 +280,13 @@ addMsg(data?.reply || "OK", "bot");
     if (open) setTimeout(() => input?.focus(), 50);
   }
 
-  btn.addEventListener("click", () => toggle(panel.style.display !== "flex"));
-  closeBtn.addEventListener("click", () => toggle(false));
-  sendBtn.addEventListener("click", send);
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") send();
-  });
+  btn?.addEventListener("click", () => toggle(panel.style.display !== "flex"));
+  closeBtn?.addEventListener("click", () => toggle(false));
+  sendBtn?.addEventListener("click", send);
+  input?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") send();
+});
+
 
   // First message
   addMsg("Γεια σου! Πώς μπορώ να βοηθήσω; (π.χ. check-in, πρωινό, parking)", "bot");
