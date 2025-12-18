@@ -65,6 +65,7 @@ app.use(express.json({ limit: "100kb" }));
 
 // ---- Serve static files ----
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/public", express.static(path.join(__dirname, "public")));
 
 // ---- Demo page ----
 app.get("/demo", (req, res) => {
