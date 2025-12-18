@@ -48,13 +48,7 @@
   border: 1px solid rgba(15,23,42,.08);
 }
 
-/* Desktop full-screen mode */
-.hai-panel.hai-full{
-  left: 10px; right: 10px; top: 10px; bottom: 10px;
-  width: auto !important;
-  height: auto !important;
-  border-radius: 18px;
-}
+
 
 .hai-header{
   display: flex;
@@ -231,8 +225,7 @@
       <div class="hai-sub">${hotelId} • Online</div>
     </div>
   </div>
-  <div class="hai-actions">
-    <button class="hai-max" type="button" aria-label="Full screen" title="Full screen">⤢</button>
+  <div class="hai-actions"> 
     <button class="hai-close" type="button" aria-label="Close">×</button>
   </div>
 </div>
@@ -316,15 +309,7 @@
 
   // Open/close
   btn.addEventListener("click", () => toggle(panel.style.display !== "flex"));
-  closeBtn.addEventListener("click", () => toggle(false));
-
-  // Full screen toggle (desktop + optional on mobile)
-  maxBtn.addEventListener("click", () => {
-    panel.classList.toggle("hai-full");
-    setMaxIcon();
-    setTimeout(() => input.focus(), 50);
-  });
-  setMaxIcon();
+  closeBtn.addEventListener("click", () => toggle(false)); 
 
   // Send actions
   sendBtn.addEventListener("click", send);
