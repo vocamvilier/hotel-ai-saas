@@ -123,7 +123,7 @@ app.get("/api/health/db", async (req, res) => {
       error: err.message,
     });
   }
-});
+}); 
 /**
  * Read-only analytics (tenant gated via hotel_key)
  * GET /api/analytics?hotel_id=demo-hotel&hotel_key=demo_key_123&days=7
@@ -144,7 +144,6 @@ app.get("/api/analytics", async (req, res) => {
       return res.status(401).json({ ok: false, error: "Unauthorized" });
     }
 
-    // totals (user + assistant)
     const totalRes = await pool.query(
       `
       SELECT COUNT(*)::int AS total_messages
@@ -155,7 +154,6 @@ app.get("/api/analytics", async (req, res) => {
       [hotel_id, String(days)]
     );
 
-    // unique sessions (based on any messages)
     const sessionsRes = await pool.query(
       `
       SELECT COUNT(DISTINCT session_id)::int AS unique_sessions
@@ -166,7 +164,23 @@ app.get("/api/analytics", async (req, res) => {
       [hotel_id, String(days)]
     );
 
-    // assistant replies split by source, per day
+    const totalsBySourceRes = await pool.query(
+      `
+      SELECT COALESCE(source, 'unknown') AS source, COUNT(*)::int AS count
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND role = 'assistant'
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      GROUP BY 1
+      ORDER BY 2 DESC
+      `,
+      [hotel_id, String(days)]
+    );
+
+    const totals_by_source = Object.fromEntries(
+      totalsBySourceRes.rows.map(r => [r.source, r.count])
+    );
+
     const byDayRes = await pool.query(
       `
       SELECT
@@ -183,14 +197,16 @@ app.get("/api/analytics", async (req, res) => {
       [hotel_id, String(days)]
     );
 
-    // normalize to: [{ day, faq: n, faq_db: n, openai: n, limit: n, dummy: n, unknown: n }]
     const map = new Map();
-    for (const r of byDayRes.rows) {
-      const d = r.day.toISOString().slice(0, 10);
-      if (!map.has(d)) map.set(d, { day: d });
-      map.get(d)[r.source] = r.count;
-    }
-    const by_day = Array.from(map.values());
+for (const r of byDayRes.rows) {
+  const d = r.day.toISOString().slice(0, 10);
+  if (!map.has(d)) {
+    map.set(d, { day: d, faq: 0, faq_db: 0, openai: 0, limit: 0, dummy: 0, unknown: 0 });
+  }
+  map.get(d)[r.source] = r.count;
+}
+const by_day = Array.from(map.values());
+
 
     return res.json({
       ok: true,
@@ -198,6 +214,7 @@ app.get("/api/analytics", async (req, res) => {
       days,
       total_messages: totalRes.rows[0]?.total_messages ?? 0,
       unique_sessions: sessionsRes.rows[0]?.unique_sessions ?? 0,
+      totals_by_source,
       by_day,
     });
   } catch (err) {
@@ -205,6 +222,101 @@ app.get("/api/analytics", async (req, res) => {
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });
+/**
+ * Read-only analytics summary (tenant gated via hotel_key)
+ * GET /api/analytics/summary?hotel_id=demo-hotel&hotel_key=demo_key_123&days=7
+ */
+app.get("/api/analytics/summary", async (req, res) => {
+  try {
+    const hotel_id = String(req.query.hotel_id || "");
+    const hotel_key = String(req.query.hotel_key || "");
+    const daysRaw = Number(req.query.days ?? 7);
+    const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
+
+    if (!hotel_id || !hotel_key) {
+      return res.status(400).json({ ok: false, error: "hotel_id and hotel_key are required" });
+    }
+
+    const expectedKey = HOTEL_KEYS[hotel_id];
+    if (!expectedKey || hotel_key !== expectedKey) {
+      return res.status(401).json({ ok: false, error: "Unauthorized" });
+    }
+
+    const hotel = await getHotel(hotel_id);
+    if (!hotel) return res.status(404).json({ ok: false, error: "Hotel not found" });
+
+    const totalRes = await pool.query(
+      `
+      SELECT COUNT(*)::int AS total_messages
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      `,
+      [hotel_id, String(days)]
+    );
+
+    const sessionsRes = await pool.query(
+      `
+      SELECT COUNT(DISTINCT session_id)::int AS unique_sessions
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      `,
+      [hotel_id, String(days)]
+    );
+
+    const sourcesRes = await pool.query(
+      `
+      SELECT COALESCE(source, 'unknown') AS source, COUNT(*)::int AS count
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND role = 'assistant'
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      GROUP BY 1
+      ORDER BY 2 DESC
+      `,
+      [hotel_id, String(days)]
+    );
+
+    const counts = Object.fromEntries(sourcesRes.rows.map(r => [r.source, r.count]));
+    const faqTotal = (counts.faq || 0) + (counts.faq_db || 0);
+    const aiTotal = (counts.openai || 0);
+    const limitTotal = (counts.limit || 0);
+    const unknownTotal = (counts.unknown || 0);
+    const plan = (hotel.plan || "basic").toLowerCase();
+    const cap = getPlanRules(plan).aiDailyCap;
+    const freeTotal = faqTotal;   // δωρεάν απαντήσεις (FAQ + FAQ_DB)
+    const paidTotal = aiTotal;    // AI απαντήσεις (OpenAI)
+    
+    const summary =
+      `Αναφορά τελευταίων ${days} ημερών για ${hotel.name} (${hotel_id}, plan: ${plan.toUpperCase()}): ` +
+      `${totalRes.rows[0]?.total_messages ?? 0} συνολικά μηνύματα, ` +
+      `${sessionsRes.rows[0]?.unique_sessions ?? 0} μοναδικά sessions. ` +
+      `Απαντήσεις assistant: ${freeTotal} δωρεάν (FAQ), ${paidTotal} με AI. ` +
+      (limitTotal ? `Το όριο AI χτυπήθηκε ${limitTotal} φορές. ` : "") +
+      (unknownTotal ? `(${unknownTotal} παλαιότερες απαντήσεις χωρίς source.) ` : "") +
+      `Ημερήσιο AI όριο plan: ${cap}/ημέρα.`;
+
+    return res.json({
+      ok: true,
+      hotel_id,
+      days,
+      plan,
+      ai_daily_cap: cap,
+      free_total: freeTotal,
+      paid_total: paidTotal,
+      total_messages: totalRes.rows[0]?.total_messages ?? 0,
+      unique_sessions: sessionsRes.rows[0]?.unique_sessions ?? 0,
+      assistant_sources: counts,
+      summary,
+
+    });
+  } catch (err) {
+    console.error("analytics summary error:", err);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
 
 // ---- Simple in-memory rate limit (per hotel_id + session_id) ----
 const buckets = new Map(); // key -> { count, windowStartMs }
