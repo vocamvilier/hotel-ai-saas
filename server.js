@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import { pool } from "./db.js";
 // ===============================
 // Daily AI limit (MVP – in memory)
 // ===============================
@@ -85,6 +86,21 @@ app.get("/api/health", (req, res) => {
     hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
     model: MODEL,
   });
+});
+app.get("/api/health/db", async (req, res) => {
+  try {
+    const r = await pool.query("SELECT now()");
+    res.json({
+      ok: true,
+      dbTime: r.rows[0].now,
+    });
+  } catch (err) {
+    console.error("DB health error:", err);
+    res.status(500).json({
+      ok: false,
+      error: err.message,
+    });
+  }
 });
 
 // ---- Simple in-memory rate limit (per hotel_id + session_id) ----
