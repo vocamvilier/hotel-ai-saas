@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
 import { pool } from "./db.js";
+console.log("🔥 SERVER.JS LOADED 🔥");
 // ===============================
 // Daily AI limit (MVP – in memory)
 // ===============================
@@ -71,6 +72,9 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 // ---- Demo page ----
 app.get("/demo", (req, res) => {
   res.sendFile(path.join(__dirname, "demo", "demo-hotel.html"));
+});
+app.get("/api/iamalive", (req, res) => {
+  res.json({ ok: true, msg: "I AM ALIVE FROM SERVER.JS" });
 });
 
 /**
