@@ -36,7 +36,6 @@ function incrementAI(hotelId) {
   aiCallsByHotel.set(key, used + 1);
 }
 
-dotenv.config();
 // MVP tenant hardening (no DB)
 const HOTEL_KEYS = {
   "demo-hotel": "demo_key_123",
