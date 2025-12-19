@@ -124,6 +124,87 @@ app.get("/api/health/db", async (req, res) => {
     });
   }
 });
+/**
+ * Read-only analytics (tenant gated via hotel_key)
+ * GET /api/analytics?hotel_id=demo-hotel&hotel_key=demo_key_123&days=7
+ */
+app.get("/api/analytics", async (req, res) => {
+  try {
+    const hotel_id = String(req.query.hotel_id || "");
+    const hotel_key = String(req.query.hotel_key || "");
+    const daysRaw = Number(req.query.days ?? 7);
+    const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
+
+    if (!hotel_id || !hotel_key) {
+      return res.status(400).json({ ok: false, error: "hotel_id and hotel_key are required" });
+    }
+
+    const expectedKey = HOTEL_KEYS[hotel_id];
+    if (!expectedKey || hotel_key !== expectedKey) {
+      return res.status(401).json({ ok: false, error: "Unauthorized" });
+    }
+
+    // totals (user + assistant)
+    const totalRes = await pool.query(
+      `
+      SELECT COUNT(*)::int AS total_messages
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      `,
+      [hotel_id, String(days)]
+    );
+
+    // unique sessions (based on any messages)
+    const sessionsRes = await pool.query(
+      `
+      SELECT COUNT(DISTINCT session_id)::int AS unique_sessions
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      `,
+      [hotel_id, String(days)]
+    );
+
+    // assistant replies split by source, per day
+    const byDayRes = await pool.query(
+      `
+      SELECT
+        date_trunc('day', created_at) AS day,
+        COALESCE(source, 'unknown') AS source,
+        COUNT(*)::int AS count
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND role = 'assistant'
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      GROUP BY 1,2
+      ORDER BY 1 ASC, 2 ASC
+      `,
+      [hotel_id, String(days)]
+    );
+
+    // normalize to: [{ day, faq: n, faq_db: n, openai: n, limit: n, dummy: n, unknown: n }]
+    const map = new Map();
+    for (const r of byDayRes.rows) {
+      const d = r.day.toISOString().slice(0, 10);
+      if (!map.has(d)) map.set(d, { day: d });
+      map.get(d)[r.source] = r.count;
+    }
+    const by_day = Array.from(map.values());
+
+    return res.json({
+      ok: true,
+      hotel_id,
+      days,
+      total_messages: totalRes.rows[0]?.total_messages ?? 0,
+      unique_sessions: sessionsRes.rows[0]?.unique_sessions ?? 0,
+      by_day,
+    });
+  } catch (err) {
+    console.error("analytics error:", err);
+    return res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
 
 // ---- Simple in-memory rate limit (per hotel_id + session_id) ----
 const buckets = new Map(); // key -> { count, windowStartMs }
