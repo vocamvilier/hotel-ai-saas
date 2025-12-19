@@ -1,3 +1,4 @@
+import { getHotel, getFaqs, upsertSession, logMessage } from "./dbQueries.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
@@ -159,16 +160,16 @@ function faqFirst(text) {
 app.post("/api/chat", async (req, res) => {
   try {
     const { hotel_id, hotel_key, session_id, message } = req.body || {};
-// Tenant hardening check
-const expectedKey = HOTEL_KEYS[hotel_id];
-if (!expectedKey || hotel_key !== expectedKey) {
-  return res.status(401).json({
-    ok: false,
-    reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
-    source: "auth",
-  });
-}
 
+    // Tenant hardening check (κρατάμε όπως είναι)
+    const expectedKey = HOTEL_KEYS[hotel_id];
+    if (!expectedKey || hotel_key !== expectedKey) {
+      return res.status(401).json({
+        ok: false,
+        reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
+        source: "auth",
+      });
+    }
 
     if (!hotel_id || typeof message !== "string") {
       return res.status(400).json({ error: "Missing hotel_id or message" });
@@ -190,16 +191,69 @@ if (!expectedKey || hotel_key !== expectedKey) {
       return res.status(429).json({ error: "Too many messages. Please slow down." });
     }
 
-    // 1) FAQ-first (0 cost)
+    // ---------- DB: load hotel + decide lang + upsert session ----------
+    const hotel = await getHotel(hotel_id);
+    if (!hotel) {
+      return res.status(404).json({
+        ok: false,
+        source: "hotel",
+        reply: "Δεν βρέθηκε το ξενοδοχείο. Έλεγξε το hotel_id.",
+      });
+    }
+
+    // very simple lang guess (μίνι, χωρίς deps)
+    const looksEnglish = /[a-zA-Z]/.test(msg) && !/[α-ωΑ-Ω]/.test(msg);
+    const lang = looksEnglish ? "en" : "el";
+
+    await upsertSession(hotel_id, sid);
+
+    // log user message
+    await logMessage({ hotelId: hotel_id, sessionId: sid, role: "user", message: msg, lang });
+
+    // ---------- 1) FAQ-first (existing in-memory, 0 cost) ----------
     const faqReply = faqFirst(msg);
     if (faqReply) {
+      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: faqReply, lang });
       return res.json({ reply: faqReply, source: "faq" });
     }
 
-    // 2) OpenAI fallback
+    // ---------- 1.5) FAQ-from-DB (hotel_id + lang) ----------
+    const faqs = await getFaqs(hotel_id, lang);
+
+    // super-minimal matching: if msg contains a keyword from question (first significant word)
+    const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    const msgN = norm(msg);
+
+    let dbFaqHit = null;
+    for (const f of faqs) {
+      const q = norm(f.question);
+      if (!q) continue;
+
+      // try direct containment either way
+      if (msgN.includes(q) || q.includes(msgN)) {
+        dbFaqHit = f;
+        break;
+      }
+
+      // try first meaningful token from question
+      const token = q.split(" ").find(w => w.length >= 4);
+      if (token && msgN.includes(token)) {
+        dbFaqHit = f;
+        break;
+      }
+    }
+
+    if (dbFaqHit?.answer) {
+      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: dbFaqHit.answer, lang });
+      return res.json({ reply: dbFaqHit.answer, source: "faq_db" });
+    }
+
+    // ---------- 2) OpenAI fallback ----------
     if (!process.env.OPENAI_API_KEY) {
+      const dummy = `(${hotel_id}) Λάβαμε το μήνυμα: "${msg}"`;
+      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: dummy, lang });
       return res.json({
-        reply: `(${hotel_id}) Λάβαμε το μήνυμα: "${msg}"`,
+        reply: dummy,
         source: "dummy",
       });
     }
@@ -210,33 +264,48 @@ if (!expectedKey || hotel_key !== expectedKey) {
       "If the guest asks for something you cannot know (prices, availability, booking confirmation), ask ONE short follow-up question. " +
       "Keep responses short (1-4 sentences).";
 
+    // include DB hotel settings to steer responses (minimal)
+    const hotelCtx =
+      `Hotel name: ${hotel.name}\n` +
+      `Hotel plan: ${hotel.plan}\n` +
+      `Supported languages: ${(hotel.languages || []).join(", ")}\n` +
+      `Welcome message: ${hotel.welcome_message || ""}\n`;
+
     const input =
+      hotelCtx +
       `Hotel ID: ${hotel_id}\n` +
       `Session ID: ${sid}\n` +
       `Guest message: ${msg}\n\n` +
       "Reply as the hotel's receptionist.";
 
     // Daily AI limit guard (counts only OpenAI fallback)
-if (!canCallAI(hotel_id)) {
-  return res.status(429).json({
-    ok: false,
-    source: "limit",
-    reply: `Έχουμε φτάσει το ημερήσιο όριο AI για σήμερα. Ρώτα κάτι από τα FAQ (check-in, check-out, parking, breakfast) ή δοκίμασε ξανά αύριο 🙂`,
-  });
-}
-const response = await openai.responses.create({
+    if (!canCallAI(hotel_id)) {
+      const limitMsg = `Έχουμε φτάσει το ημερήσιο όριο AI για σήμερα. Ρώτα κάτι από τα FAQ (check-in, check-out, parking, breakfast) ή δοκίμασε ξανά αύριο 🙂`;
+      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: limitMsg, lang });
+      return res.status(429).json({
+        ok: false,
+        source: "limit",
+        reply: limitMsg,
+      });
+    }
+
+    const response = await openai.responses.create({
       model: MODEL,
       instructions,
       input,
       max_output_tokens: MAX_OUTPUT_TOKENS,
       temperature: TEMPERATURE,
     });
-incrementAI(hotel_id);
+    incrementAI(hotel_id);
+
+    const finalReply =
+      response.output_text ||
+      "Συγγνώμη, δεν κατάφερα να απαντήσω. Θέλεις να το πεις λίγο διαφορετικά;";
+
+    await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: finalReply, lang });
 
     return res.json({
-      reply:
-        response.output_text ||
-        "Συγγνώμη, δεν κατάφερα να απαντήσω. Θέλεις να το πεις λίγο διαφορετικά;",
+      reply: finalReply,
       source: "openai",
     });
   } catch (err) {
