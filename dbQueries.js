@@ -30,10 +30,18 @@ export async function upsertSession(hotelId, sessionId) {
   );
 }
 
-export async function logMessage({ hotelId, sessionId, role, message, lang }) {
+export async function logMessage({
+  hotelId,
+  sessionId,
+  role,
+  message,
+  lang,
+  source = null,
+}) {
   await pool.query(
-    `INSERT INTO chat_messages (hotel_id, session_id, role, message, lang)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [hotelId, sessionId, role, message, lang || "el"]
+    `INSERT INTO chat_messages (hotel_id, session_id, role, message, lang, source)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [hotelId, sessionId, role, message, lang || "el", source]
   );
 }
+

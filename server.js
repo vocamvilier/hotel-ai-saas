@@ -6,7 +6,21 @@ import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
 import { pool } from "./db.js";
-console.log("🔥 SERVER.JS LOADED 🔥");
+const PLAN_RULES = {
+  basic: {
+    aiDailyCap: Number(process.env.BASIC_DAILY_AI_CALL_LIMIT ?? 10),
+    allowedLanguages: ["el", "en"],
+  },
+  pro: {
+    aiDailyCap: Number(process.env.PRO_DAILY_AI_CALL_LIMIT ?? 100),
+    allowedLanguages: ["el", "en", "de", "fr", "it", "es"],
+  },
+};
+
+function getPlanRules(plan) {
+  return PLAN_RULES[(plan || "basic").toLowerCase()] ?? PLAN_RULES.basic;
+}
+
 // ===============================
 // Daily AI limit (MVP – in memory)
 // ===============================
@@ -73,9 +87,6 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 app.get("/demo", (req, res) => {
   res.sendFile(path.join(__dirname, "demo", "demo-hotel.html"));
 });
-app.get("/api/iamalive", (req, res) => {
-  res.json({ ok: true, msg: "I AM ALIVE FROM SERVER.JS" });
-});
 
 /**
  * Health check
@@ -89,18 +100,6 @@ app.get("/api/chat", (req, res) => {
 });
 app.get("/", (req, res) => {
   res.send("Hotel AI SaaS backend is running 🚀");
-});
-app.get("/api/_routes", (req, res) => {
-  const routes = [];
-  app._router.stack.forEach((layer) => {
-    if (layer.route?.path) {
-      const methods = Object.keys(layer.route.methods)
-        .join(",")
-        .toUpperCase();
-      routes.push(`${methods} ${layer.route.path}`);
-    }
-  });
-  res.json({ ok: true, routes });
 });
 
 app.get("/api/health", (req, res) => {
@@ -222,25 +221,48 @@ app.post("/api/chat", async (req, res) => {
         reply: "Δεν βρέθηκε το ξενοδοχείο. Έλεγξε το hotel_id.",
       });
     }
-
     // very simple lang guess (μίνι, χωρίς deps)
-    const looksEnglish = /[a-zA-Z]/.test(msg) && !/[α-ωΑ-Ω]/.test(msg);
-    const lang = looksEnglish ? "en" : "el";
+const looksEnglish = /[a-zA-Z]/.test(msg) && !/[α-ωΑ-Ω]/.test(msg);
+const lang = looksEnglish ? "en" : "el";
+
+const rules = getPlanRules(hotel.plan);
+const aiDailyCap = rules.aiDailyCap;
+
+// enforce plan language list
+const effectiveLang = rules.allowedLanguages.includes(lang) ? lang : "en";
+
+
 
     await upsertSession(hotel_id, sid);
 
     // log user message
-    await logMessage({ hotelId: hotel_id, sessionId: sid, role: "user", message: msg, lang });
+    await logMessage({
+  hotelId: hotel_id,
+  sessionId: sid,
+  role: "user",
+  message: msg,
+  lang: effectiveLang,
+  source: "user",
+});
+
 
     // ---------- 1) FAQ-first (existing in-memory, 0 cost) ----------
     const faqReply = faqFirst(msg);
     if (faqReply) {
-      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: faqReply, lang });
-      return res.json({ reply: faqReply, source: "faq" });
+      await logMessage({
+  hotelId: hotel_id,
+  sessionId: sid,
+  role: "assistant",
+  message: faqReply,
+  lang: effectiveLang,
+  source: "faq",
+});
+return res.json({ reply: faqReply, source: "faq" });
+
     }
 
     // ---------- 1.5) FAQ-from-DB (hotel_id + lang) ----------
-    const faqs = await getFaqs(hotel_id, lang);
+    const faqs = await getFaqs(hotel_id, effectiveLang);
 
     // super-minimal matching: if msg contains a keyword from question (first significant word)
     const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -266,18 +288,29 @@ app.post("/api/chat", async (req, res) => {
     }
 
     if (dbFaqHit?.answer) {
-      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: dbFaqHit.answer, lang });
-      return res.json({ reply: dbFaqHit.answer, source: "faq_db" });
-    }
+    await logMessage({
+  hotelId: hotel_id,
+  sessionId: sid,
+  role: "assistant",
+  message: dbFaqHit.answer,
+  lang: effectiveLang,
+  source: "faq_db",
+});
+return res.json({ reply: dbFaqHit.answer, source: "faq_db" });
+}
 
     // ---------- 2) OpenAI fallback ----------
     if (!process.env.OPENAI_API_KEY) {
       const dummy = `(${hotel_id}) Λάβαμε το μήνυμα: "${msg}"`;
-      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: dummy, lang });
-      return res.json({
-        reply: dummy,
-        source: "dummy",
-      });
+     await logMessage({
+  hotelId: hotel_id,
+  sessionId: sid,
+  role: "assistant",
+  message: dummy,
+  lang: effectiveLang,
+  source: "dummy",
+});
+
     }
 
     const instructions =
@@ -300,16 +333,30 @@ app.post("/api/chat", async (req, res) => {
       `Guest message: ${msg}\n\n` +
       "Reply as the hotel's receptionist.";
 
-    // Daily AI limit guard (counts only OpenAI fallback)
-    if (!canCallAI(hotel_id)) {
-      const limitMsg = `Έχουμε φτάσει το ημερήσιο όριο AI για σήμερα. Ρώτα κάτι από τα FAQ (check-in, check-out, parking, breakfast) ή δοκίμασε ξανά αύριο 🙂`;
-      await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: limitMsg, lang });
-      return res.status(429).json({
-        ok: false,
-        source: "limit",
-        reply: limitMsg,
-      });
-    }
+    // Daily AI limit guard (plan-based)
+resetIfNewDay();
+const used = aiCallsByHotel.get(hotel_id) || 0;
+
+if (used >= aiDailyCap) {
+  const limitMsg =
+    "Έχουμε φτάσει το ημερήσιο όριο AI για σήμερα. Ρώτα κάτι από τα FAQ (check-in, check-out, parking, breakfast) ή δοκίμασε ξανά αύριο 🙂";
+
+  await logMessage({
+    hotelId: hotel_id,
+    sessionId: sid,
+    role: "assistant",
+    message: limitMsg,
+    lang: effectiveLang,
+    source: "limit",
+  });
+
+  return res.status(429).json({
+    ok: false,
+    source: "limit",
+    reply: limitMsg,
+  });
+}
+
 
     const response = await openai.responses.create({
       model: MODEL,
@@ -324,12 +371,15 @@ app.post("/api/chat", async (req, res) => {
       response.output_text ||
       "Συγγνώμη, δεν κατάφερα να απαντήσω. Θέλεις να το πεις λίγο διαφορετικά;";
 
-    await logMessage({ hotelId: hotel_id, sessionId: sid, role: "assistant", message: finalReply, lang });
+    await logMessage({
+  hotelId: hotel_id,
+  sessionId: sid,
+  role: "assistant",
+  message: finalReply,
+  lang: effectiveLang,
+  source: "openai",
+});
 
-    return res.json({
-      reply: finalReply,
-      source: "openai",
-    });
   } catch (err) {
     console.error("Chat error:", err);
     return res.status(500).json({
