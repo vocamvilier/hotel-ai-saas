@@ -84,6 +84,9 @@ app.use((req, res, next) => {
   console.log("➡️", req.method, req.originalUrl);
   next();
 });
+app.get("/api/chat", (req, res) => {
+  res.json({ ok: true, note: "Use POST /api/chat" });
+});
 app.get("/", (req, res) => {
   res.send("Hotel AI SaaS backend is running 🚀");
 });
