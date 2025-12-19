@@ -80,6 +80,18 @@ app.get("/demo", (req, res) => {
 app.get("/", (req, res) => {
   res.send("Hotel AI SaaS backend is running 🚀");
 });
+app.get("/api/_routes", (req, res) => {
+  const routes = [];
+  app._router.stack.forEach((layer) => {
+    if (layer.route?.path) {
+      const methods = Object.keys(layer.route.methods)
+        .join(",")
+        .toUpperCase();
+      routes.push(`${methods} ${layer.route.path}`);
+    }
+  });
+  res.json({ ok: true, routes });
+});
 
 app.get("/api/health", (req, res) => {
   res.json({
