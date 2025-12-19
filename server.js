@@ -80,6 +80,10 @@ app.get("/api/iamalive", (req, res) => {
 /**
  * Health check
  */
+app.use((req, res, next) => {
+  console.log("➡️", req.method, req.originalUrl);
+  next();
+});
 app.get("/", (req, res) => {
   res.send("Hotel AI SaaS backend is running 🚀");
 });
