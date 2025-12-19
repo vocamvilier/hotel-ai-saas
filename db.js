@@ -8,6 +8,6 @@ if (!process.env.DATABASE_URL_INTERNAL) {
 }
 
 export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL_INTERNAL,
   ssl: { rejectUnauthorized: false }
 });
