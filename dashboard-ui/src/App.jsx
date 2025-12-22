@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Layout from "./app/Layout.jsx";
 
 const API_BASE = "https://hotel-ai-saas.onrender.com";
 const HOTEL_ID = "demo-hotel";
@@ -63,6 +64,7 @@ async function sendTestBooking() {
   }, []);
 
   return (
+     <Layout>
     <div style={{
       minHeight: "100vh",
       background: "radial-gradient(1200px 600px at 20% 10%, rgba(34,197,94,.18), transparent 60%)," +
@@ -143,5 +145,6 @@ async function sendTestBooking() {
         )}
       </div>
     </div>
+    </Layout> 
   );
 }
