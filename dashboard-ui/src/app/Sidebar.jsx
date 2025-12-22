@@ -1,17 +1,16 @@
-const Item = ({ label, active = false }) => (
-  <div
-    style={{
-      padding: "10px 14px",
-      borderRadius: 10,
-      fontWeight: active ? 700 : 500,
-      opacity: active ? 1 : 0.75,
-      background: active ? "rgba(255,255,255,0.08)" : "transparent",
-      cursor: "pointer",
-    }}
-  >
-    {label}
-  </div>
-);
+import { NavLink } from "react-router-dom";
+
+const linkStyle = ({ isActive }) => ({
+  display: "block",
+  padding: "10px 14px",
+  borderRadius: 10,
+  fontWeight: isActive ? 700 : 500,
+  opacity: isActive ? 1 : 0.75,
+  background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
+  textDecoration: "none",
+  color: "white",
+  cursor: "pointer",
+});
 
 export default function Sidebar() {
   return (
@@ -27,10 +26,10 @@ export default function Sidebar() {
       </div>
 
       <div style={{ display: "grid", gap: 8 }}>
-        <Item label="Overview" active />
-        <Item label="Analytics" />
-        <Item label="Live Chat" />
-        <Item label="Settings" />
+        <NavLink to="/overview" style={linkStyle}>Overview</NavLink>
+        <NavLink to="/analytics" style={linkStyle}>Analytics</NavLink>
+        <NavLink to="/live-chat" style={linkStyle}>Live Chat</NavLink>
+        <NavLink to="/settings" style={linkStyle}>Settings</NavLink>
       </div>
     </aside>
   );
