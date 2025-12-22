@@ -13,7 +13,7 @@
         String(Date.now()) + Math.random().toString(16).slice(2));
     localStorage.setItem(SESSION_KEY, sessionId);
   }
-
+  
   // Basic styles (inline to keep MVP simple)
   const style = document.createElement("style");
   style.textContent = `
@@ -192,6 +192,22 @@
   opacity: .6;
   padding: 0 12px 10px;
 }
+.hai-cta{
+  padding: 0 12px 12px;
+  background: #fff;
+  border-top: 1px solid rgba(15,23,42,.08);
+}
+.hai-book{
+  display: block;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-decoration: none;
+  font-weight: 800;
+  background: linear-gradient(135deg, #0b1b2b 0%, #16a34a 100%);
+  color: #fff;
+}
+.hai-book:active{ transform: translateY(1px); }
 
 /* Mobile: full-screen panel (app-like) */
 @media (max-width: 520px){
@@ -236,7 +252,9 @@
   <input class="hai-input" type="text" placeholder="Write a message..." autocomplete="off" />
   <button class="hai-send" type="button">Send</button>
 </div>
-
+<div class="hai-cta">
+  <a class="hai-book" href="#" data-hai-booking data-label="widget_book_now">Book now</a>
+</div>
 <div class="hai-meta"></div>
 `;
 
@@ -316,6 +334,18 @@
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") send();
   });
+// Booking CTA tracking
+panel.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-hai-booking]");
+  if (!el) return;
+
+  e.preventDefault();
+
+  trackEvent("booking_click", {
+    label: el.getAttribute("data-label") || "booking",
+    href: el.getAttribute("href") || null,
+  });
+});
 
   // First message
   addMsg("Γεια σου! Πώς μπορώ να βοηθήσω; (π.χ. check-in, πρωινό, parking)", "bot");
