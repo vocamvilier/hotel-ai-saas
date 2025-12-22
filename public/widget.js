@@ -334,6 +334,46 @@
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") send();
   });
+// --- event tracking (required for booking CTA) ---
+function getCfg() {
+  // use the script tag that loaded this widget
+  const s =
+    document.currentScript ||
+    document.querySelector('script[src*="widget.js"]');
+
+  return {
+    hotel_id: s?.getAttribute("data-hotel") || "demo-hotel",
+    hotel_key: s?.getAttribute("data-key") || "demo_key_123",
+    api_base: s?.getAttribute("data-base") || "https://hotel-ai-saas.onrender.com",
+  };
+}
+
+const session_id =
+  (window.__hai_session_id ||= "w_" + Date.now() + "_" + Math.random().toString(16).slice(2));
+
+async function trackEvent(event_type, meta = {}) {
+  const cfg = getCfg();
+
+  const res = await fetch(`${cfg.api_base}/api/events`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      hotel_id: cfg.hotel_id,
+      hotel_key: cfg.hotel_key,
+      session_id,
+      event_type,
+      meta,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    console.warn("trackEvent failed:", res.status, txt);
+  } else {
+    // helpful for debugging
+    console.log("trackEvent ok:", event_type);
+  }
+}
 // Booking CTA tracking
 panel.addEventListener("click", (e) => {
   const el = e.target.closest("[data-hai-booking]");
