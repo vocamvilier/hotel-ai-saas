@@ -172,19 +172,24 @@ async function ensureEventsTable() {
 }
 
 /**
- * ===============================
- * EXISTING: Analytics (kept)
- * GET /api/analytics?hotel_id=...&hotel_key=...&days=7
- * ===============================
+ * Read-only analytics (tenant gated via hotel_key)
+ * GET /api/analytics?hotel_id=demo-hotel&hotel_key=demo_key_123&days=7
  */
 app.get("/api/analytics", async (req, res) => {
   try {
-    const t = assertTenant(req, res);
-    if (!t) return;
-    const { hotel_id } = t;
-
+    const hotel_id = String(req.query.hotel_id || "");
+    const hotel_key = String(req.query.hotel_key || "");
     const daysRaw = Number(req.query.days ?? 7);
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
+
+    if (!hotel_id || !hotel_key) {
+      return res.status(400).json({ ok: false, error: "hotel_id and hotel_key are required" });
+    }
+
+    const expectedKey = HOTEL_KEYS[hotel_id];
+    if (!expectedKey || hotel_key !== expectedKey) {
+      return res.status(401).json({ ok: false, error: "Unauthorized" });
+    }
 
     const totalRes = await pool.query(
       `
@@ -192,7 +197,7 @@ app.get("/api/analytics", async (req, res) => {
       FROM chat_messages
       WHERE hotel_id = $1
         AND created_at >= NOW() - ($2::text || ' days')::interval
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -202,7 +207,7 @@ app.get("/api/analytics", async (req, res) => {
       FROM chat_messages
       WHERE hotel_id = $1
         AND created_at >= NOW() - ($2::text || ' days')::interval
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -215,7 +220,7 @@ app.get("/api/analytics", async (req, res) => {
         AND created_at >= NOW() - ($2::text || ' days')::interval
       GROUP BY 1
       ORDER BY 2 DESC
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -223,6 +228,7 @@ app.get("/api/analytics", async (req, res) => {
       totalsBySourceRes.rows.map((r) => [r.source, r.count])
     );
 
+    // Existing by_day (assistant replies by source)
     const byDayRes = await pool.query(
       `
       SELECT date_trunc('day', created_at) AS day,
@@ -234,7 +240,7 @@ app.get("/api/analytics", async (req, res) => {
         AND created_at >= NOW() - ($2::text || ' days')::interval
       GROUP BY 1,2
       ORDER BY 1 ASC, 2 ASC
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -248,6 +254,38 @@ app.get("/api/analytics", async (req, res) => {
     }
     const by_day = Array.from(map.values());
 
+    // ✅ NEW: chats_per_day (user messages per day) – best for “usage”
+    const chatsPerDayRes = await pool.query(
+      `
+      SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS date,
+             COUNT(*)::int AS count
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND role = 'user'
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      GROUP BY 1
+      ORDER BY 1 ASC
+      `,
+      [hotel_id, String(days)]
+    );
+    const chats_per_day = chatsPerDayRes.rows;
+
+    // ✅ NEW: peak_hours (user messages per hour)
+    const peakHoursRes = await pool.query(
+      `
+      SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
+             COUNT(*)::int AS count
+      FROM chat_messages
+      WHERE hotel_id = $1
+        AND role = 'user'
+        AND created_at >= NOW() - ($2::text || ' days')::interval
+      GROUP BY 1
+      ORDER BY 1 ASC
+      `,
+      [hotel_id, String(days)]
+    );
+    const peak_hours = peakHoursRes.rows;
+
     return res.json({
       ok: true,
       hotel_id,
@@ -256,12 +294,17 @@ app.get("/api/analytics", async (req, res) => {
       unique_sessions: sessionsRes.rows[0]?.unique_sessions ?? 0,
       totals_by_source,
       by_day,
+
+      // new fields for charts:
+      chats_per_day,
+      peak_hours,
     });
   } catch (err) {
     console.error("analytics error:", err);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });
+
 
 /**
  * ===============================
