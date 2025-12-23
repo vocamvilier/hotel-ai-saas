@@ -1,75 +1,30 @@
+/* ===== Light SaaS Theme (single source of truth) ===== */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  --bg-main: #f5f7fb;
+  --bg-card: #ffffff;
+  --border-card: #e6e8ef;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
 
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.08);
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
+* { box-sizing: border-box; }
 
-body {
+html, body, #root {
+  height: 100%;
+  width: 100%;
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
+a { color: inherit; text-decoration: none; }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-}
-
-/* ===== Light Shell Layout ===== */
+/* ===== Shell Layout ===== */
 .app-shell {
   min-height: 100vh;
   display: grid;
@@ -86,9 +41,67 @@ button:focus-visible {
 .app-content {
   padding: 18px;
   min-width: 0;
+  background: var(--bg-main);
 }
 
-/* Sidebar */
+/* ===== Cards ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  color: var(--text-main);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+}
+
+.card.kpi {
+  background: linear-gradient(180deg, #ffffff, #f8faff);
+}
+
+.kpi-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.kpi-value {
+  font-size: 44px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+.kpi-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ===== Buttons ===== */
+button {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+button:hover {
+  background: rgba(37, 99, 235, 0.15);
+}
+
+/* ===== Recharts polish for light ===== */
+.recharts-cartesian-grid line { stroke: #e5e7eb; }
+.recharts-text { fill: #475569; }
+
+/* ===== Sidebar ===== */
 .sidebar {
   background: #ffffff;
   border-right: 1px solid var(--border-card);
@@ -119,7 +132,7 @@ button:focus-visible {
 }
 
 .brand-title {
-  font-weight: 800;
+  font-weight: 900;
   color: var(--text-main);
   letter-spacing: -0.01em;
 }
@@ -142,7 +155,7 @@ button:focus-visible {
   border-radius: 12px;
   text-decoration: none;
   color: var(--text-main);
-  font-weight: 600;
+  font-weight: 800;
   border: 1px solid transparent;
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
@@ -159,9 +172,7 @@ button:focus-visible {
   color: var(--accent);
 }
 
-.sidebar-footer {
-  margin-top: auto;
-}
+.sidebar-footer { margin-top: auto; }
 
 .sidebar-help {
   background: #f8fafc;
@@ -171,9 +182,8 @@ button:focus-visible {
 }
 
 .help-title {
-  font-weight: 800;
+  font-weight: 900;
   font-size: 12px;
-  color: var(--text-main);
   margin-bottom: 4px;
 }
 
@@ -182,7 +192,7 @@ button:focus-visible {
   color: var(--text-muted);
 }
 
-/* Topbar */
+/* ===== Topbar ===== */
 .topbar {
   height: 58px;
   background: #ffffff;
@@ -203,7 +213,7 @@ button:focus-visible {
 .topbar-label {
   font-size: 12px;
   color: var(--text-muted);
-  font-weight: 700;
+  font-weight: 900;
 }
 
 .topbar-select {
@@ -213,14 +223,7 @@ button:focus-visible {
   border: 1px solid var(--border-card);
   background: #ffffff;
   color: var(--text-main);
-  font-weight: 700;
-}
-
-.topbar-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.25);
+  font-weight: 800;
 }
 
 .pill {
@@ -230,7 +233,7 @@ button:focus-visible {
   padding: 7px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 900;
   border: 1px solid var(--border-card);
   background: #ffffff;
   color: var(--text-main);
@@ -280,21 +283,11 @@ button:focus-visible {
   background: var(--accent);
 }
 
-.user-name {
-  font-weight: 800;
-  color: var(--text-main);
-}
-
-.user-caret {
-  color: var(--text-muted);
-}
+.user-name { font-weight: 900; }
+.user-caret { color: var(--text-muted); }
 
 /* Mobile */
 @media (max-width: 900px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-  .sidebar {
-    display: none; /* later we can add a hamburger */
-  }
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
 }

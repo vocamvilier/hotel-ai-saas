@@ -2,7 +2,7 @@ import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
 import { Outlet } from "react-router-dom";
 
-export default function Layout({ children }) {
+export default function Layout() {
   return (
     <div className="app-shell">
       <Sidebar />
@@ -10,7 +10,7 @@ export default function Layout({ children }) {
       <div className="app-main">
         <Topbar />
         <main className="app-content">
-          {children ? children : <Outlet />}
+          <Outlet />
         </main>
       </div>
     </div>
