@@ -1,5 +1,4 @@
 import "dotenv/config";
-
 import path from "path";
 import { fileURLToPath } from "url";
 import express from "express";
@@ -46,26 +45,13 @@ function resetIfNewDay() {
     aiCallsByHotel = new Map();
   }
 }
-function canCallAI(hotelId) {
-  resetIfNewDay();
-  const key = hotelId || "unknown";
-  const used = aiCallsByHotel.get(key) || 0;
-  return used < DAILY_LIMIT;
-}
+
 function incrementAI(hotelId) {
   resetIfNewDay();
   const key = hotelId || "unknown";
   const used = aiCallsByHotel.get(key) || 0;
   aiCallsByHotel.set(key, used + 1);
 }
-
-/**
- * ===============================
- * Tenant hardening (MVP – no DB keys yet)
- * ===============================
- */
-
-
 
 /**
  * ===============================
@@ -96,7 +82,6 @@ app.use(express.json({ limit: "100kb" }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/public", express.static(path.join(__dirname, "public")));
 
-
 // ---- Request log ----
 app.use((req, _res, next) => {
   console.log("➡️", req.method, req.originalUrl);
@@ -104,11 +89,11 @@ app.use((req, _res, next) => {
 });
 
 // ---- Simple GET guard ----
-app.get("/api/chat", (req, res) => {
+app.get("/api/chat", (_req, res) => {
   res.json({ ok: true, note: "Use POST /api/chat" });
 });
 
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.send("Hotel AI SaaS backend is running ");
 });
 
@@ -117,11 +102,15 @@ app.get("/", (req, res) => {
  * Health
  * ===============================
  */
-app.get("/api/health", (req, res) => {
-  res.json({ ok: true, hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY), model: MODEL });
+app.get("/api/health", (_req, res) => {
+  res.json({
+    ok: true,
+    hasOpenAIKey: Boolean(process.env.OPENAI_API_KEY),
+    model: MODEL,
+  });
 });
 
-app.get("/api/health/db", async (req, res) => {
+app.get("/api/health/db", async (_req, res) => {
   try {
     const r = await pool.query("SELECT now()");
     res.json({ ok: true, dbTime: r.rows[0].now });
@@ -148,8 +137,12 @@ async function ensureEventsTable() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_chat_events_hotel_time ON chat_events (hotel_id, created_at DESC);`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_chat_events_hotel_type_time ON chat_events (hotel_id, event_type, created_at DESC);`);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_chat_events_hotel_time ON chat_events (hotel_id, created_at DESC);`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_chat_events_hotel_type_time ON chat_events (hotel_id, event_type, created_at DESC);`
+  );
 }
 
 /**
@@ -158,13 +151,13 @@ async function ensureEventsTable() {
  */
 app.get("/api/analytics", async (req, res) => {
   try {
-    
     const tenant = assertTenant(req, res);
     if (!tenant) return;
     const { hotel_id } = tenant;
 
     const daysRaw = Number(req.query.days ?? 7);
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
+
     const totalRes = await pool.query(
       `
       SELECT COUNT(*)::int AS total_messages
@@ -222,7 +215,15 @@ app.get("/api/analytics", async (req, res) => {
     for (const r of byDayRes.rows) {
       const d = r.day.toISOString().slice(0, 10);
       if (!map.has(d)) {
-        map.set(d, { day: d, faq: 0, faq_db: 0, openai: 0, limit: 0, dummy: 0, unknown: 0 });
+        map.set(d, {
+          day: d,
+          faq: 0,
+          faq_db: 0,
+          openai: 0,
+          limit: 0,
+          dummy: 0,
+          unknown: 0,
+        });
       }
       map.get(d)[r.source] = r.count;
     }
@@ -242,7 +243,6 @@ app.get("/api/analytics", async (req, res) => {
       `,
       [hotel_id, String(days)]
     );
-    const chats_per_day = chatsPerDayRes.rows;
 
     // ✅ NEW: peak_hours (user messages per hour)
     const peakHoursRes = await pool.query(
@@ -258,7 +258,6 @@ app.get("/api/analytics", async (req, res) => {
       `,
       [hotel_id, String(days)]
     );
-    const peak_hours = peakHoursRes.rows;
 
     return res.json({
       ok: true,
@@ -268,17 +267,14 @@ app.get("/api/analytics", async (req, res) => {
       unique_sessions: sessionsRes.rows[0]?.unique_sessions ?? 0,
       totals_by_source,
       by_day,
-
-      // new fields for charts:
-      chats_per_day,
-      peak_hours,
+      chats_per_day: chatsPerDayRes.rows,
+      peak_hours: peakHoursRes.rows,
     });
   } catch (err) {
     console.error("analytics error:", err);
     return res.status(500).json({ ok: false, error: "Internal server error" });
   }
 });
-
 
 /**
  * ===============================
@@ -288,7 +284,9 @@ app.get("/api/analytics", async (req, res) => {
  */
 app.get("/api/analytics/summary", async (req, res) => {
   try {
-    
+    const t = assertTenant(req, res);
+    if (!t) return;
+    const { hotel_id } = t;
 
     const daysRaw = Number(req.query.days ?? 7);
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
@@ -302,7 +300,7 @@ app.get("/api/analytics/summary", async (req, res) => {
       FROM chat_messages
       WHERE hotel_id = $1
         AND created_at >= NOW() - ($2::text || ' days')::interval
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -312,7 +310,7 @@ app.get("/api/analytics/summary", async (req, res) => {
       FROM chat_messages
       WHERE hotel_id = $1
         AND created_at >= NOW() - ($2::text || ' days')::interval
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -325,7 +323,7 @@ app.get("/api/analytics/summary", async (req, res) => {
         AND created_at >= NOW() - ($2::text || ' days')::interval
       GROUP BY 1
       ORDER BY 2 DESC
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -345,7 +343,7 @@ app.get("/api/analytics/summary", async (req, res) => {
       `Αναφορά τελευταίων ${days} ημερών για ${hotel.name} (${hotel_id}, plan: ${plan.toUpperCase()}): ` +
       `${totalRes.rows[0]?.total_messages ?? 0} συνολικά μηνύματα, ` +
       `${sessionsRes.rows[0]?.unique_sessions ?? 0} μοναδικά sessions.\n` +
-      `Απαντήσεις assistant: ${freeTotal} δωρεάν (FAQ), ${paidTotal} με AI. ` +
+      `Απαντήσεις assistant: ${freeTotal} δωρεάν (FAQ), ${paidTotal} με AI.\n` +
       (limitTotal ? `Το όριο AI χτυπήθηκε ${limitTotal} φορές.\n` : "") +
       (unknownTotal ? `(${unknownTotal} παλαιότερες απαντήσεις χωρίς source.) ` : "") +
       `Ημερήσιο AI όριο plan: ${cap}/ημέρα.`;
@@ -376,9 +374,12 @@ app.get("/api/analytics/summary", async (req, res) => {
  * ===============================
  */
 app.get("/api/dashboard/overview", async (req, res) => {
-  console.log("OVERVIEW HIT", req.query);
-try {
-   
+  try {
+    const tenant = assertTenant(req, res);
+    if (!tenant) return;
+    const { hotel_id } = tenant;
+
+    console.log("OVERVIEW HIT", { ...req.query, resolved_hotel_id: hotel_id });
 
     const daysRaw = Number(req.query.days ?? 7);
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
@@ -390,7 +391,7 @@ try {
       FROM chat_messages
       WHERE hotel_id = $1
         AND created_at >= NOW() - ($2::text || ' days')::interval
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -400,7 +401,7 @@ try {
       FROM chat_messages
       WHERE hotel_id = $1
         AND created_at >= NOW() - ($2::text || ' days')::interval
-    `,
+      `,
       [hotel_id, String(days)]
     );
 
@@ -413,7 +414,7 @@ try {
         AND created_at >= NOW() - ($2::text || ' days')::interval
       GROUP BY 1
       ORDER BY 2 DESC
-    `,
+      `,
       [hotel_id, String(days)]
     );
     const languages_used = langsRes.rows;
@@ -429,13 +430,12 @@ try {
       GROUP BY 1
       ORDER BY 2 DESC
       LIMIT 6
-    `,
+      `,
       [hotel_id, String(days)]
     );
     const peak_hours = peakRes.rows;
 
-    // Top FAQ proxy (until we add faq_id/intent logging):
-    // show top repeated user questions (normalized first 70 chars)
+    // Top FAQ proxy (until we add intent logging)
     const topFaqProxyRes = await pool.query(
       `
       SELECT LEFT(REGEXP_REPLACE(LOWER(message), '\\s+', ' ', 'g'), 70) AS topic,
@@ -448,7 +448,7 @@ try {
       GROUP BY 1
       ORDER BY 2 DESC
       LIMIT 8
-    `,
+      `,
       [hotel_id, String(days)]
     );
     const top_questions = topFaqProxyRes.rows;
@@ -462,10 +462,13 @@ try {
         AND created_at >= NOW() - ($2::text || ' days')::interval
       GROUP BY 1
       ORDER BY 2 DESC
-    `,
+      `,
       [hotel_id, String(days)]
     );
-    const events_by_type = Object.fromEntries(eventsRes.rows.map(r => [r.event_type, r.count]));
+
+    const events_by_type = Object.fromEntries(
+      eventsRes.rows.map((r) => [r.event_type, r.count])
+    );
 
     const unique_sessions = sessionsRes.rows[0]?.unique_sessions ?? 0;
     const booking_clicks = events_by_type.booking_click || 0;
@@ -473,7 +476,9 @@ try {
 
     const conversion_booking = unique_sessions > 0 ? booking_clicks / unique_sessions : 0;
     const conversion_lead = unique_sessions > 0 ? leads_created / unique_sessions : 0;
-console.log("OVERVIEW DATA READY");
+
+    console.log("OVERVIEW DATA READY");
+
     return res.json({
       ok: true,
       hotel_id,
@@ -507,9 +512,15 @@ console.log("OVERVIEW DATA READY");
  */
 app.get("/api/conversations/live", async (req, res) => {
   try {
+    const tenant = assertTenant(req, res);
+    if (!tenant) return;
+    const { hotel_id } = tenant;
 
     const minutesRaw = Number(req.query.minutes ?? 30);
-    const minutes = Math.min(Math.max(Number.isFinite(minutesRaw) ? minutesRaw : 30, 1), 24 * 60);
+    const minutes = Math.min(
+      Math.max(Number.isFinite(minutesRaw) ? minutesRaw : 30, 1),
+      24 * 60
+    );
 
     const limitRaw = Number(req.query.limit ?? 40);
     const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 40, 1), 200);
@@ -546,7 +557,7 @@ app.get("/api/conversations/live", async (req, res) => {
       JOIN counts c USING (session_id)
       ORDER BY l.last_message_at DESC
       LIMIT $3
-    `,
+      `,
       [hotel_id, String(minutes), limit]
     );
 
@@ -574,6 +585,9 @@ const ALLOWED_EVENT_TYPES = new Set([
 
 app.post("/api/events", async (req, res) => {
   try {
+    const tenant = assertTenant(req, res);
+    if (!tenant) return;
+    const { hotel_id } = tenant;
 
     const session_id = String(req.body?.session_id || "").trim();
     const event_type = String(req.body?.event_type || "").trim();
@@ -593,7 +607,7 @@ app.post("/api/events", async (req, res) => {
       `
       INSERT INTO chat_events (hotel_id, session_id, event_type, meta)
       VALUES ($1, $2, $3, $4::jsonb)
-    `,
+      `,
       [hotel_id, session_id, event_type, JSON.stringify(meta)]
     );
 
@@ -610,10 +624,12 @@ app.post("/api/events", async (req, res) => {
  * ===============================
  */
 const buckets = new Map(); // key -> { count, windowStartMs }
+
 function hitRateLimit(key) {
   const now = Date.now();
   const windowMs = 60_000;
   const entry = buckets.get(key);
+
   if (!entry || now - entry.windowStartMs > windowMs) {
     buckets.set(key, { count: 1, windowStartMs: now });
     return false;
@@ -636,7 +652,7 @@ const FAQ = [
   {
     match: [/check[- ]?out/i, /τσεκ ?άουτ/i, /αναχώρηση/i],
     answer:
-      "Το check-out είναι έως 11:00. Αν θέλετε late check-out, πείτε μου περίπου τι ώρα και θα σας ενημερώσω για διαθεσιμότητα/πιθανή χρέωση.",
+      "Το check-out είναι έως 11:00.\nΑν θέλετε late check-out, πείτε μου περίπου τι ώρα και θα σας ενημερώσω για διαθεσιμότητα/πιθανή χρέωση.",
   },
   {
     match: [/parking/i, /παρκ/i, /στάθμευση/i],
@@ -670,26 +686,24 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { hotel_id, hotel_key, session_id, message } = req.body || {};
 
-    
-const tenant = assertTenant(req, res);
-if (!tenant) {
-  return res.status(401).json({
-    ok: false,
-    reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
-    source: "auth",
-  });
-}
-const { hotel_id: tenantHotelId } = tenant;
+    const tenant = assertTenant(req, res);
+    if (!tenant) {
+      return res.status(401).json({
+        ok: false,
+        reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
+        source: "auth",
+      });
+    }
+    const { hotel_id: tenantHotelId } = tenant;
 
-// extra hardening: body hotel_id must match validated tenant hotel_id
-if (String(hotel_id || "").trim() !== tenantHotelId) {
-  return res.status(401).json({
-    ok: false,
-    reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
-    source: "auth",
-  });
-}
-
+    // extra hardening: body hotel_id must match validated tenant hotel_id
+    if (String(hotel_id || "").trim() !== tenantHotelId) {
+      return res.status(401).json({
+        ok: false,
+        reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
+        source: "auth",
+      });
+    }
 
     if (!hotel_id || typeof message !== "string") {
       return res.status(400).json({ error: "Missing hotel_id or message" });
@@ -699,7 +713,9 @@ if (String(hotel_id || "").trim() !== tenantHotelId) {
     if (!msg) return res.status(400).json({ error: "Empty message" });
 
     if (msg.length > MAX_MESSAGE_CHARS) {
-      return res.status(413).json({ error: `Message too long (max ${MAX_MESSAGE_CHARS} chars)` });
+      return res
+        .status(413)
+        .json({ error: `Message too long (max ${MAX_MESSAGE_CHARS} chars)` });
     }
 
     const sid = session_id || "no-session";
@@ -756,7 +772,6 @@ if (String(hotel_id || "").trim() !== tenantHotelId) {
 
     // 1.5) FAQ-from-DB
     const faqs = await getFaqs(hotel_id, effectiveLang);
-
     const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
     const msgN = norm(msg);
 
@@ -769,6 +784,7 @@ if (String(hotel_id || "").trim() !== tenantHotelId) {
         dbFaqHit = f;
         break;
       }
+
       const token = q.split(" ").find((w) => w.length >= 4);
       if (token && msgN.includes(token)) {
         dbFaqHit = f;
@@ -829,6 +845,7 @@ if (String(hotel_id || "").trim() !== tenantHotelId) {
       const limitMsg =
         "Έχουμε φτάσει το ημερήσιο όριο AI για σήμερα.\n" +
         "Ρώτα κάτι από τα FAQ (check-in, check-out, parking, breakfast) ή δοκίμασε ξανά αύριο.";
+
       await logMessage({
         hotelId: hotel_id,
         sessionId: sid,
@@ -837,7 +854,12 @@ if (String(hotel_id || "").trim() !== tenantHotelId) {
         lang: effectiveLang,
         source: "limit",
       });
-      return res.status(429).json({ ok: false, source: "limit", reply: limitMsg });
+
+      return res.status(429).json({
+        ok: false,
+        source: "limit",
+        reply: limitMsg,
+      });
     }
 
     const response = await openai.responses.create({
