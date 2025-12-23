@@ -112,20 +112,10 @@ export default function Analytics() {
       >
         <h1 style={{ margin: 0 }}>Analytics</h1>
 
-        <button
-          onClick={load}
-          style={{
-            marginLeft: "auto",
-            padding: "8px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.15)",
-            background: "rgba(255,255,255,0.06)",
-            color: "white",
-            cursor: "pointer",
-          }}
-        >
-          Refresh
-        </button>
+        <button onClick={load} style={{ marginLeft: "auto" }}>
+  Refresh
+</button>
+
       </div>
 
       {err ? (
