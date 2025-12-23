@@ -1,26 +1,29 @@
 export default function Topbar() {
   return (
-    <header
-      style={{
-        padding: "12px 16px",
-        borderBottom: "1px solid rgba(255,255,255,0.08)",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <span style={{ opacity: 0.7 }}>Hotel</span>
-        <select defaultValue="demo-hotel">
+    <header className="topbar">
+      <div className="topbar-left">
+        <div className="topbar-label">Hotel</div>
+        <select className="topbar-select" defaultValue="demo-hotel">
           <option value="demo-hotel">demo-hotel</option>
         </select>
 
-        <span style={{ opacity: 0.6 }}>•</span>
-        <span style={{ fontWeight: 600 }}>Widget: Online</span>
+        <span className="topbar-dot" />
+
+        <div className="topbar-status">
+          <span className="pill pill-online">Widget: Online</span>
+        </div>
       </div>
 
-      <div style={{ opacity: 0.8 }}>
-        Nick ▾
+      <div className="topbar-right">
+        <button className="icon-btn" title="Notifications" aria-label="Notifications">
+          🔔
+        </button>
+
+        <button className="user-btn" aria-label="User menu">
+          <span className="user-avatar">N</span>
+          <span className="user-name">Nick</span>
+          <span className="user-caret">▾</span>
+        </button>
       </div>
     </header>
   );

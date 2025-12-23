@@ -1,23 +1,16 @@
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
+import { Outlet } from "react-router-dom";
 
 export default function Layout({ children }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        background: "linear-gradient(180deg,#071a2b,#020617)",
-        color: "white",
-      }}
-    >
+    <div className="app-shell">
       <Sidebar />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <div className="app-main">
         <Topbar />
-
-        <main style={{ padding: 20 }}>
-          {children}
+        <main className="app-content">
+          {children ? children : <Outlet />}
         </main>
       </div>
     </div>

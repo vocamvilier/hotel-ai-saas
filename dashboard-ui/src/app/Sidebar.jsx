@@ -1,35 +1,39 @@
 import { NavLink } from "react-router-dom";
 
-const linkStyle = ({ isActive }) => ({
-  display: "block",
-  padding: "10px 14px",
-  borderRadius: 10,
-  fontWeight: isActive ? 700 : 500,
-  opacity: isActive ? 1 : 0.75,
-  background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
-  textDecoration: "none",
-  color: "white",
-  cursor: "pointer",
-});
-
 export default function Sidebar() {
   return (
-    <aside
-      style={{
-        width: 240,
-        padding: 16,
-        borderRight: "1px solid rgba(255,255,255,0.08)",
-      }}
-    >
-      <div style={{ fontWeight: 800, marginBottom: 20 }}>
-        Hotel-AI
+    <aside className="sidebar">
+      <div className="sidebar-brand">
+        <div className="brand-mark">HA</div>
+        <div>
+          <div className="brand-title">Hotel-AI</div>
+          <div className="brand-sub">Dashboard</div>
+        </div>
       </div>
 
-      <div style={{ display: "grid", gap: 8 }}>
-        <NavLink to="/overview" style={linkStyle}>Overview</NavLink>
-        <NavLink to="/analytics" style={linkStyle}>Analytics</NavLink>
-        <NavLink to="/live-chat" style={linkStyle}>Live Chat</NavLink>
-        <NavLink to="/settings" style={linkStyle}>Settings</NavLink>
+      <nav className="sidebar-nav">
+        <NavLink end to="/" className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}>
+          Overview
+        </NavLink>
+
+        <NavLink to="/analytics" className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}>
+          Analytics
+        </NavLink>
+
+        <NavLink to="/live-chat" className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}>
+          Live Chat
+        </NavLink>
+
+        <NavLink to="/settings" className={({ isActive }) => "nav-item" + (isActive ? " active" : "")}>
+          Settings
+        </NavLink>
+      </nav>
+
+      <div className="sidebar-footer">
+        <div className="sidebar-help">
+          <div className="help-title">Tip</div>
+          <div className="help-text">Use the hotel selector to switch tenants.</div>
+        </div>
       </div>
     </aside>
   );
