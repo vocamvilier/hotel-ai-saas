@@ -68,3 +68,77 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+/* ===== SaaS Glow System ===== */
+
+:root {
+  --glow-primary: rgba(110, 168, 255, 0.35);
+  --glow-secondary: rgba(79, 124, 255, 0.25);
+  --card-bg: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.08),
+    rgba(255,255,255,0.02)
+  );
+  --card-border: rgba(255,255,255,0.14);
+}
+
+/* Generic Card */
+.card {
+  background: var(--card-bg);
+  border-radius: 18px;
+  border: 1px solid var(--card-border);
+  padding: 18px;
+  position: relative;
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 30px 80px rgba(0,0,0,0.55),
+    0 0 30px var(--glow-secondary);
+}
+
+/* KPI Card Glow */
+.card.kpi::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: radial-gradient(
+    120px 60px at 20% 0%,
+    var(--glow-primary),
+    transparent 60%
+  );
+  pointer-events: none;
+}
+
+/* Big KPI number */
+.kpi-value {
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-shadow:
+    0 0 20px rgba(110,168,255,.35);
+}
+
+.kpi-label {
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.kpi-sub {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+/* Chart polish */
+.recharts-cartesian-grid line {
+  stroke: rgba(255,255,255,0.12);
+}
+
+.recharts-tooltip-wrapper {
+  filter: drop-shadow(0 10px 25px rgba(0,0,0,.6));
+}
