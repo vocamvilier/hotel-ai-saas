@@ -8,6 +8,7 @@ import OpenAI from "openai";
 
 import { pool } from "./db.js";
 import { getHotel, getFaqs, upsertSession, logMessage } from "./dbQueries.js";
+import { assertTenant } from "./middleware/tenantGate.js";
 
 /**
  * ===============================
@@ -63,28 +64,8 @@ function incrementAI(hotelId) {
  * Tenant hardening (MVP – no DB keys yet)
  * ===============================
  */
-const HOTEL_KEYS = {
-  "demo-hotel": "demo_key_123",
-  "olympia-athens": "olympia_secret_456",
-};
 
-function assertTenant(req, res) {
-  const hotel_id =
-    String(req.query.hotel_id || req.body?.hotel_id || "").trim();
-  const hotel_key =
-    String(req.query.hotel_key || req.body?.hotel_key || "").trim();
 
-  if (!hotel_id || !hotel_key) {
-    res.status(400).json({ ok: false, error: "hotel_id and hotel_key are required" });
-    return null;
-  }
-  const expectedKey = HOTEL_KEYS[hotel_id];
-  if (!expectedKey || hotel_key !== expectedKey) {
-    res.status(401).json({ ok: false, error: "Unauthorized" });
-    return null;
-  }
-  return { hotel_id, hotel_key };
-}
 
 /**
  * ===============================
@@ -177,20 +158,13 @@ async function ensureEventsTable() {
  */
 app.get("/api/analytics", async (req, res) => {
   try {
-    const hotel_id = String(req.query.hotel_id || "");
-    const hotel_key = String(req.query.hotel_key || "");
+    
+    const tenant = assertTenant(req, res);
+    if (!tenant) return;
+    const { hotel_id } = tenant;
+
     const daysRaw = Number(req.query.days ?? 7);
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
-
-    if (!hotel_id || !hotel_key) {
-      return res.status(400).json({ ok: false, error: "hotel_id and hotel_key are required" });
-    }
-
-    const expectedKey = HOTEL_KEYS[hotel_id];
-    if (!expectedKey || hotel_key !== expectedKey) {
-      return res.status(401).json({ ok: false, error: "Unauthorized" });
-    }
-
     const totalRes = await pool.query(
       `
       SELECT COUNT(*)::int AS total_messages
@@ -314,9 +288,7 @@ app.get("/api/analytics", async (req, res) => {
  */
 app.get("/api/analytics/summary", async (req, res) => {
   try {
-    const t = assertTenant(req, res);
-    if (!t) return;
-    const { hotel_id } = t;
+    
 
     const daysRaw = Number(req.query.days ?? 7);
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
@@ -405,9 +377,7 @@ app.get("/api/analytics/summary", async (req, res) => {
  */
 app.get("/api/dashboard/overview", async (req, res) => {
   try {
-    const t = assertTenant(req, res);
-    if (!t) return;
-    const { hotel_id } = t;
+   
 
     const daysRaw = Number(req.query.days ?? 7);
     const days = Math.min(Math.max(Number.isFinite(daysRaw) ? daysRaw : 7, 1), 90);
@@ -536,9 +506,6 @@ app.get("/api/dashboard/overview", async (req, res) => {
  */
 app.get("/api/conversations/live", async (req, res) => {
   try {
-    const t = assertTenant(req, res);
-    if (!t) return;
-    const { hotel_id } = t;
 
     const minutesRaw = Number(req.query.minutes ?? 30);
     const minutes = Math.min(Math.max(Number.isFinite(minutesRaw) ? minutesRaw : 30, 1), 24 * 60);
@@ -606,9 +573,6 @@ const ALLOWED_EVENT_TYPES = new Set([
 
 app.post("/api/events", async (req, res) => {
   try {
-    const t = assertTenant(req, res);
-    if (!t) return;
-    const { hotel_id } = t;
 
     const session_id = String(req.body?.session_id || "").trim();
     const event_type = String(req.body?.event_type || "").trim();
@@ -705,15 +669,26 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { hotel_id, hotel_key, session_id, message } = req.body || {};
 
-    // Tenant hardening (kept)
-    const expectedKey = HOTEL_KEYS[hotel_id];
-    if (!expectedKey || hotel_key !== expectedKey) {
-      return res.status(401).json({
-        ok: false,
-        reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
-        source: "auth",
-      });
-    }
+    
+const tenant = assertTenant(req, res);
+if (!tenant) {
+  return res.status(401).json({
+    ok: false,
+    reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
+    source: "auth",
+  });
+}
+const { hotel_id: tenantHotelId } = tenant;
+
+// extra hardening: body hotel_id must match validated tenant hotel_id
+if (String(hotel_id || "").trim() !== tenantHotelId) {
+  return res.status(401).json({
+    ok: false,
+    reply: "Μη εξουσιοδοτημένο ξενοδοχείο.",
+    source: "auth",
+  });
+}
+
 
     if (!hotel_id || typeof message !== "string") {
       return res.status(400).json({ error: "Missing hotel_id or message" });
