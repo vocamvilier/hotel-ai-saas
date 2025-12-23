@@ -376,7 +376,8 @@ app.get("/api/analytics/summary", async (req, res) => {
  * ===============================
  */
 app.get("/api/dashboard/overview", async (req, res) => {
-  try {
+  console.log("OVERVIEW HIT", req.query);
+try {
    
 
     const daysRaw = Number(req.query.days ?? 7);
@@ -472,7 +473,7 @@ app.get("/api/dashboard/overview", async (req, res) => {
 
     const conversion_booking = unique_sessions > 0 ? booking_clicks / unique_sessions : 0;
     const conversion_lead = unique_sessions > 0 ? leads_created / unique_sessions : 0;
-
+console.log("OVERVIEW DATA READY");
     return res.json({
       ok: true,
       hotel_id,
